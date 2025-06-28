@@ -36,9 +36,7 @@ aantal_landen = df_train_lang['land_idx'].nunique()
 
 #lagss
 df_train_lang = df_train_lang.sort_values(['ISO3', 'Jaar'])
-# lag-1 van kwetsbaarheid
 df_train_lang['kwetsbaarheid_lag1'] = df_train_lang.groupby('ISO3')['kwetsbaarheid'].shift(1)
-# residu-1: verschil werkelijke verandering minus vorige lag
 df_train_lang['residu_lag1'] = (
     df_train_lang.groupby('ISO3')['kwetsbaarheid'].diff()
     - df_train_lang['kwetsbaarheid_lag1'].diff()
