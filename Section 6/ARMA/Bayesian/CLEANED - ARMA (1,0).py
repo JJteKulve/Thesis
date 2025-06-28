@@ -41,7 +41,6 @@ df_train_lang = df_train_lang.dropna().copy()
 
 #ar1
 with pm.Model() as model:
-    # hiërarchische prior voor de autoregressiecoëfficiënten (φ_i)
     mu_phi    = pm.Normal('mu_phi', mu=0.85, sigma=0.1)
     sigma_phi = pm.Exponential('sigma_phi', 5.0)
     phi       = pm.Normal(
@@ -50,13 +49,12 @@ with pm.Model() as model:
         sigma=sigma_phi,
         shape=aantal_landen
     )
-    # meetfout
+
     sigma = pm.Exponential('sigma', lam=1/0.03)
 
-    # verwachte waarde: φ_i * waarde vorig jaar
     mu = phi[df_train_lang['land_idx'].values] * df_train_lang['kwetsbaarheid_lag1'].values
 
-    # waarnemingen
+
     y_obs = pm.Normal(
         'y_obs',
         mu=mu,
@@ -64,31 +62,30 @@ with pm.Model() as model:
         observed=df_train_lang['kwetsbaarheid'].values
     )
 
-    # variational inference (ADVI) en steekproef
+
     approx = pm.fit(method="advi", n=15000)
     trace  = approx.sample(1000)
 
-# === 5. In-sample evaluatie (AIC, BIC, MAE, RMSE) ===
-# gemiddelde φ per land uit de posterior
+
 phi_gemiddeld = trace.posterior['phi'].mean(('chain', 'draw')).values
 phi_vec = phi_gemiddeld[df_train_lang['land_idx'].values]
 
-# voorspelde en werkelijke waarden in-sample
+
 y_pred_in = phi_vec * df_train_lang['kwetsbaarheid_lag1'].values
 y_true_in = df_train_lang['kwetsbaarheid'].values
 
-# foutmaten
+
 mse_in = mean_squared_error(y_true_in, y_pred_in)
 mae_in = mean_absolute_error(y_true_in, y_pred_in)
 n = len(y_true_in)
-k = 1  # aantal parameters in eenvoudige AIC/BIC
+k = 1 
 aic = n * np.log(mse_in) + 2 * k
 bic = n * np.log(mse_in) + np.log(n) * k
 
-# === 6. Forecast voor 2021 en 2022 ===
+
 forecast_df = df_test_lang.sort_values(['ISO3', 'Jaar']).reset_index(drop=True)
 
-# laatste bekende waarde per land uit de trainingsset
+
 laatste_waarde = (
     df_train_lang.sort_values('Jaar')
     .groupby('ISO3')['kwetsbaarheid']
@@ -96,7 +93,7 @@ laatste_waarde = (
     .copy()
 )
 
-# map van ISO3 naar index
+
 land_idx_map = dict(zip(land_codes, range(aantal_landen)))
 
 records = []
@@ -106,7 +103,7 @@ for jaar in [2021, 2022]:
         y_lag = laatste_waarde[iso3]
         y_hat = phi_i * y_lag
 
-        # echte waarde uit testset
+
         y_true = forecast_df.loc[
             (forecast_df['ISO3'] == iso3) &
             (forecast_df['Jaar'] == jaar),
@@ -121,12 +118,12 @@ for jaar in [2021, 2022]:
             'kwetsbaarheid_werkelijk': y_true
         })
 
-        # update voor volgend jaar
+
         laatste_waarde[iso3] = y_hat
 
 forecast_result = pd.DataFrame(records)
 
-# === 7. Out-of-sample evaluatie ===
+
 mae_out  = mean_absolute_error(
     forecast_result['kwetsbaarheid_werkelijk'],
     forecast_result['kwetsbaarheid_voorspelling']
@@ -136,7 +133,7 @@ rmse_out = np.sqrt(mean_squared_error(
     forecast_result['kwetsbaarheid_voorspelling']
 ))
 
-# === 8. Plot resultaten per land ===
+
 fig, axes = plt.subplots(4, 2, figsize=(14, 10), sharex=True)
 for i, ax in enumerate(axes.flatten()):
     if i >= len(land_codes):
@@ -163,7 +160,7 @@ for i, ax in enumerate(axes.flatten()):
 plt.tight_layout()
 plt.show()
 
-# === 9. LaTeX-tabel voor Overleaf ===
+
 latex = f"""
 \\begin{{table}}[htbp]
 \\centering
