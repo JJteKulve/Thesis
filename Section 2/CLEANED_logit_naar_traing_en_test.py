@@ -22,7 +22,6 @@ def splits_jaarkolommen(df: pd.DataFrame, start_train: int, einde_train: int,
     train_kolommen = [kol for kol in jaar_kolommen if any(kol.endswith(jjr) for jjr in train_jaren)]
     test_kolommen = [kol for kol in jaar_kolommen if any(kol.endswith(jjr) for jjr in test_jaren)]
 
-    #voeg is3 en name toe
     id_kolommen = ['ISO3', 'Name']
     train_df = df[id_kolommen + train_kolommen].copy()
     test_df = df[id_kolommen + test_kolommen].copy()
@@ -36,7 +35,7 @@ def sla_op(df: pd.DataFrame, bestandsnaam: str) -> None:
 
 
 def main():
-    #laad alle data
+
     df_volledig = laad_dataset(PAD_INPUT)
 
     #splits in traing en data
