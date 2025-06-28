@@ -36,15 +36,15 @@ aantal_landen = gegevens_train_lang['land_idx'].nunique()
 #1 lag
 for var in variabelen_kort:
     gegevens_train_lang[f'{var}_lag1'] = gegevens_train_lang.groupby('ISO3')[var].shift(1)
-# Verwijder rijen met ontbrekende waarden
+
 gegevens_train_lang = gegevens_train_lang.dropna().copy()
 
-# === 4. Bayesian model met variational inference ===
+
 with pm.Model() as model:
     mu_phi = pm.Normal('mu_phi', mu=0.2, sigma=0.3)
     sigma_phi = pm.Exponential('sigma_phi', 2.0)
 
-    # Regionale parameters per variabele
+   
     phi = {
         var: pm.Normal(
             f'phi_{var}',
@@ -57,13 +57,13 @@ with pm.Model() as model:
 
     sigma = pm.Exponential('sigma', lam=1/0.03)
 
-    #mean forecasts doen
+
     mu = sum(
         phi[var][gegevens_train_lang['land_idx'].values] * gegevens_train_lang[f'{var}_lag1'].values
         for var in variabelen_kort
     ) / len(variabelen_kort)
 
-    #werkelijke y
+
     y_obs = pm.Normal(
         'y_obs',
         mu=mu,
@@ -71,7 +71,7 @@ with pm.Model() as model:
         observed=gegevens_train_lang['vulner'].values
     )
 
-    #vdi
+
     approx = pm.fit(method="advi", n=20000)
     trace = approx.sample(1000)
 
@@ -82,12 +82,12 @@ phi_means = np.stack([
     for v in variabelen_kort
 ], axis=1)
 
-# prediction
+
 voorsp_in = phi_means * X_lag
 vulner_pred = voorsp_in.mean(axis=1)
 vulner_true = gegevens_train_lang['vulner'].values
 
-# mse en mae in sample doen
+
 in_sample_mse = mean_squared_error(vulner_true, vulner_pred)
 in_sample_mae = mean_absolute_error(vulner_true, vulner_pred)
 
@@ -106,13 +106,13 @@ laatste_X = (
 )
 land_idx_map = dict(zip(land_namen, range(aantal_landen)))
 
-#posterior phi
+
 phi_post = {
     var: trace.posterior[f'phi_{var}'].mean(('chain', 'draw')).values
     for var in variabelen_kort
 }
 
-#loop voor 2021 en 2022
+
 resultaten_prognose = []
 prognose_df = gegevens_test_lang.copy()
 prognose_df['land_idx'] = prognose_df['ISO3'].map(land_idx_map)
@@ -120,20 +120,18 @@ prognose_df['land_idx'] = prognose_df['ISO3'].map(land_idx_map)
 for jaar in [2021, 2022]:
     temp = prognose_df[prognose_df['Year'] == jaar].copy()
 
-    # Voeg lag-1 X toe
+   
     for var in variabelen_kort:
         temp[f'{var}_lag1'] = temp['ISO3'].map(laatste_X[var])
 
-    # Voorspel X_it
     for var in variabelen_kort:
         temp[var] = phi_post[var][temp['land_idx'].values] * temp[f'{var}_lag1'].values
 
-    # Bereken kwetsbaarheid
+
     X_mat = np.stack([temp[var].values for var in variabelen_kort], axis=1)
     phi_mat = np.stack([phi_post[var][temp['land_idx'].values] for var in variabelen_kort], axis=1)
     temp['vulner_forecast'] = (phi_mat * X_mat).mean(axis=1)
 
-    # Update X voor volgend jaar
     for var in variabelen_kort:
         laatste_X[var] = temp[var].values
 
